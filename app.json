@@ -1,0 +1,10 @@
+{
+  "plugins": [
+    "expo-asset"
+  ],
+  "extra": {
+    "eas": {
+      "projectId": "4c810b76-b953-41ce-8662-e3fd214d9646"
+    }
+  }
+}

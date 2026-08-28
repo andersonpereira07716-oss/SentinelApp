@@ -1,0 +1,13 @@
+{
+  "incidentId": "inc_883192",
+  "userId": "usr_99812A",
+  "timestamp": "2026-08-27T19:30:00Z",
+  "status": "ACTIVE",
+  "location": {
+    "type": "Point",
+    "coordinates": [-37.2758, -7.0261],
+    "geohash": "77e3xj9"
+  },
+  "mediaStreamUrl": "https://kinesis.aws.com/streams/inc_883192.m3u8",
+  "notifiedUsersCount": 14
+}
