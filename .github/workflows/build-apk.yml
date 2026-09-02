@@ -32,4 +32,4 @@ jobs:
       - name: Executar Build do APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        run: eas build --platform android --profile preview --non-interactive --no-wait --clear
