@@ -30,6 +30,4 @@ jobs:
         run: npm install -g eas-cli
 
       - name: Executar Build do APK
-        run: npx eas-cli build --platform android --profile preview --non-interactive
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: EXPO_TOKEN="${{ secrets.EXPO_TOKEN }}" npx eas-cli build --platform android --profile preview --non-interactive
