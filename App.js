@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 
+// CREDENCIAIS DO BOT DO TELEGRAM
+const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
+const TELEGRAM_CHAT_ID = '8903706213';
+
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
@@ -14,6 +18,33 @@ export default function App() {
       }
     })();
   }, []);
+
+  const sendTelegramAlert = async (latitude, longitude, mapsUrl) => {
+    const message = `🚨 *ALERTA DE EMERGÊNCIA - SENTINEL* 🚨\n\n` +
+      `Uma solicitação de socorro foi disparada!\n\n` +
+      `📍 *Localização:* \nLatitude: \`${latitude}\`\nLongitude: \`${longitude}\`\n\n` +
+      `🔗 *Google Maps:* ${mapsUrl}`;
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      });
+
+      const data = await response.json();
+      return data.ok;
+    } catch (error) {
+      console.error("Erro ao enviar mensagem no Telegram:", error);
+      return false;
+    }
+  };
 
   const handleSOS = async () => {
     setLoading(true);
@@ -32,14 +63,23 @@ export default function App() {
       const { latitude, longitude } = location.coords;
       const mapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
 
-      // Alerta imediato exibindo as coordenadas/link
-      Alert.alert(
-        "🚨 ALERTA DE EMERGÊNCIA ENVIADO!",
-        `Sua localização exata foi capturada:\n\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}\n\nO pedido de socorro foi registrado na rede Fênix.`,
-        [{ text: "OK" }]
-      );
+      // Envia alerta para o Telegram
+      const sent = await sendTelegramAlert(latitude, longitude, mapsUrl);
 
-      console.log("Localização do SOS:", mapsUrl);
+      if (sent) {
+        Alert.alert(
+          "🚨 SOS DISPARADO!",
+          "Sua localização exata foi capturada e enviada em tempo real para a rede de proteção no Telegram.",
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert(
+          "🚨 SOS DISPARADO!",
+          `Localização capturada com sucesso:\n\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}\n\nLink do mapa gerado.`,
+          [{ text: "OK" }]
+        );
+      }
+
     } catch (error) {
       Alert.alert("Erro de Sinal", "Não foi possível obter a localização. Tente novamente.");
     } finally {
@@ -72,7 +112,7 @@ export default function App() {
 
       <View style={styles.footer}>
         <Text style={styles.tipText}>
-          Aperte o botão SOS em caso de perigo imediato para enviar sua localização para a rede de proteção.
+          Aperte o botão SOS em caso de perigo imediato para enviar sua localização instantaneamente via Telegram.
         </Text>
       </View>
     </SafeAreaView>
