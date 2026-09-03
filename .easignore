@@ -1,7 +1,5 @@
 node_modules/
 .expo/
+dist/
 android/
 ios/
-dist/
-*.apk
-*.aab
