@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
+import { Accelerometer } from 'expo-sensors';
 
 // CREDENCIAIS DO BOT DO TELEGRAM
 const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
 const TELEGRAM_CHAT_ID = '8903706213';
 
+// Limite de força de aceleração para detectar o chacoalho (sensibilidade)
+const SHAKE_THRESHOLD = 2.5;
+
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [subscription, setSubscription] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -17,11 +22,37 @@ export default function App() {
         setLocationPermission(true);
       }
     })();
+
+    // Ativa a escuta do acelerômetro
+    _subscribeAccelerometer();
+
+    return () => {
+      _unsubscribeAccelerometer();
+    };
   }, []);
 
-  const sendTelegramAlert = async (latitude, longitude, mapsUrl) => {
+  const _subscribeAccelerometer = () => {
+    Accelerometer.setUpdateInterval(100); // Checa a cada 100ms
+    const sub = Accelerometer.addListener(accelerometerData => {
+      const { x, y, z } = accelerometerData;
+      // Calcula a magnitude da aceleração total (gravidade ~ 1.0)
+      const gForce = Math.sqrt(x * x + y * y + z * z);
+
+      if (gForce > SHAKE_THRESHOLD && !loading) {
+        handleSOS("Alerta ativado por movimento (Chacoalho)");
+      }
+    });
+    setSubscription(sub);
+  };
+
+  const _unsubscribeAccelerometer = () => {
+    subscription && subscription.remove();
+    setSubscription(null);
+  };
+
+  const sendTelegramAlert = async (latitude, longitude, mapsUrl, triggerType) => {
     const message = `🚨 *ALERTA DE EMERGÊNCIA - SENTINEL* 🚨\n\n` +
-      `Uma solicitação de socorro foi disparada!\n\n` +
+      `*Gatilho:* ${triggerType}\n\n` +
       `📍 *Localização:* \nLatitude: \`${latitude}\`\nLongitude: \`${longitude}\`\n\n` +
       `🔗 *Google Maps:* ${mapsUrl}`;
 
@@ -46,7 +77,7 @@ export default function App() {
     }
   };
 
-  const handleSOS = async () => {
+  const handleSOS = async (triggerSource = "Botão SOS Pressionado") => {
     setLoading(true);
     try {
       if (!locationPermission) {
@@ -64,18 +95,18 @@ export default function App() {
       const mapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
 
       // Envia alerta para o Telegram
-      const sent = await sendTelegramAlert(latitude, longitude, mapsUrl);
+      const sent = await sendTelegramAlert(latitude, longitude, mapsUrl, triggerSource);
 
       if (sent) {
         Alert.alert(
           "🚨 SOS DISPARADO!",
-          "Sua localização exata foi capturada e enviada em tempo real para a rede de proteção no Telegram.",
+          `Sua localização exata foi capturada via ${triggerSource} e enviada no Telegram.`,
           [{ text: "OK" }]
         );
       } else {
         Alert.alert(
           "🚨 SOS DISPARADO!",
-          `Localização capturada com sucesso:\n\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}\n\nLink do mapa gerado.`,
+          `Localização capturada:\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}`,
           [{ text: "OK" }]
         );
       }
@@ -99,7 +130,7 @@ export default function App() {
         <TouchableOpacity 
           activeOpacity={0.7} 
           style={styles.button}
-          onPress={handleSOS}
+          onPress={() => handleSOS("Botão SOS Pressionado")}
           disabled={loading}
         >
           {loading ? (
@@ -112,7 +143,7 @@ export default function App() {
 
       <View style={styles.footer}>
         <Text style={styles.tipText}>
-          Aperte o botão SOS em caso de perigo imediato para enviar sua localização instantaneamente via Telegram.
+          Dica: Aperte o botão SOS ou chacoalhe o celular com força em caso de emergência para enviar a localização via Telegram.
         </Text>
       </View>
     </SafeAreaView>
