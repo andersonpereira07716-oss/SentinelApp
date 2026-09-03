@@ -1,60 +1,16 @@
-
 {
   "expo": {
     "name": "SentinelApp",
     "slug": "sentinelapp",
-     "jsEngine": "hermes",
-    "android": {
-      "package": "com.anderson456.sentinelapp"
-    }
-  }
-}
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "scheme": "sentinelapp",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
+    "jsEngine": "hermes",
     "android": {
-  "permissions": [
-    "RECORD_AUDIO",
-    "ACCESS_FINE_LOCATION",
-    "ACCESS_COARSE_LOCATION"
-  ]
-}
-
-      },
       "package": "com.anderson456.sentinelapp",
-      "permissions": [
-        "android.permission.FOREGROUND_SERVICE_LOCATION",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.VIBRATE"
-      ]
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      [
-        "expo-location",
-        {
-          "locationAlwaysAndWhenInUsePermission": "O SentinelApp precisa da sua localização em segundo plano para monitorar Zonas Seguras.",
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
-        }
-      ],
-      "expo-audio"
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "4c810b76-b953-41ce-8662-e3fd214d9646"
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
       }
     }
   }
