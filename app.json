@@ -1,7 +1,14 @@
+
 {
   "expo": {
     "name": "SentinelApp",
     "slug": "sentinelapp",
+     "jsEngine": "hermes",
+    "android": {
+      "package": "com.anderson456.sentinelapp"
+    }
+  }
+}
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,9 +22,13 @@
       "supportsTablet": true
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+  "permissions": [
+    "RECORD_AUDIO",
+    "ACCESS_FINE_LOCATION",
+    "ACCESS_COARSE_LOCATION"
+  ]
+}
+
       },
       "package": "com.anderson456.sentinelapp",
       "permissions": [
