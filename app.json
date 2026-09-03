@@ -12,6 +12,12 @@
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }
+    },
+    "owner": "anderson456",
+    "extra": {
+      "eas": {
+        "projectId": "auto"
+      }
     }
   }
 }
