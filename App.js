@@ -5,7 +5,7 @@ import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
 
 const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
-const TELEGRAM_CHAT_ID = '8903706213';
+const TELEGRAM_CHAT_ID = '7370681538';
 const SHAKE_THRESHOLD = 2.5;
 
 export default function App() {
