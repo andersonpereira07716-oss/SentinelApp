@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, Modal } from 'react-native';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
 
-// CREDENCIAIS DO BOT DO TELEGRAM
 const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
 const TELEGRAM_CHAT_ID = '8903706213';
-
-// Sensibilidade para detectar o chacoalho
 const SHAKE_THRESHOLD = 2.5;
 
 export default function App() {
@@ -18,10 +15,13 @@ export default function App() {
   const [subscription, setSubscription] = useState(null);
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
+  
+  // Estado do Plano Mulher Segura
+  const [isPlanActive, setIsPlanActive] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
-      // Solicita permissões de Localização e Microfone
       let locStatus = await Location.requestForegroundPermissionsAsync();
       if (locStatus.status === 'granted') {
         setLocationPermission(true);
@@ -79,10 +79,9 @@ export default function App() {
 
       setRecording(recording);
       setIsRecording(true);
-      console.log("🎙️ Gravação de áudio de evidência iniciada em segundo plano...");
       return recording;
     } catch (err) {
-      console.error('Falha ao iniciar gravação de áudio:', err);
+      console.error('Falha ao iniciar gravação:', err);
       return null;
     }
   };
@@ -90,7 +89,8 @@ export default function App() {
   const sendTelegramAlert = async (latitude, longitude, mapsUrl, triggerType) => {
     const message = `🚨 *ALERTA DE EMERGÊNCIA - SENTINEL* 🚨\n\n` +
       `*Gatilho:* ${triggerType}\n` +
-      `🎙️ *Gravação de Áudio:* Ativada em segundo plano\n\n` +
+      `🎙️ *Gravação de Áudio:* Ativada em segundo plano\n` +
+      `🛡️ *Plano:* Mulher Segura (Ativo)\n\n` +
       `📍 *Localização:* \nLatitude: \`${latitude}\`\nLongitude: \`${longitude}\`\n\n` +
       `🔗 *Google Maps:* ${mapsUrl}`;
 
@@ -110,12 +110,18 @@ export default function App() {
       const data = await response.json();
       return data.ok;
     } catch (error) {
-      console.error("Erro ao enviar mensagem no Telegram:", error);
+      console.error("Erro no envio do Telegram:", error);
       return false;
     }
   };
 
   const handleSOS = async (triggerSource = "Botão SOS Pressionado") => {
+    if (!isPlanActive) {
+      Alert.alert("Plano Inativo", "Ative o Plano Mulher Segura para liberar a proteção contínua de emergência.");
+      setModalVisible(true);
+      return;
+    }
+
     setLoading(true);
     try {
       if (!locationPermission) {
@@ -127,15 +133,12 @@ export default function App() {
         }
       }
 
-      // Inicia a gravação de áudio em segundo plano silenciosamente
       await startSilentAudioRecording();
 
-      // Captura a localização atual precisa
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = location.coords;
       const mapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
 
-      // Envia alerta para o Telegram
       const sent = await sendTelegramAlert(latitude, longitude, mapsUrl, triggerSource);
 
       if (sent) {
@@ -164,6 +167,13 @@ export default function App() {
       <View style={styles.header}>
         <Text style={styles.title}>SENTINEL</Text>
         <Text style={styles.subtitle}>Proteção à Mulher & Patrulha</Text>
+        
+        <TouchableOpacity style={styles.planBadge} onPress={() => setModalVisible(true)}>
+          <Text style={styles.planBadgeText}>
+            🛡️ PLANO MULHER SEGURA: {isPlanActive ? 'ATIVO (R$ 10/mês)' : 'INATIVO'}
+          </Text>
+        </TouchableOpacity>
+
         <Text style={styles.status}>
           {isRecording ? "🔴 GRAVANDO ÁUDIO DE EMERGÊNCIA" : "Status: 🚨 MODO DE EMERGÊNCIA"}
         </Text>
@@ -186,9 +196,41 @@ export default function App() {
 
       <View style={styles.footer}>
         <Text style={styles.tipText}>
-          Dica: Aperte o botão SOS ou chacoalhe o celular com força para enviar a localização e gravar o áudio do ambiente.
+          Aperte o botão SOS ou chacoalhe o celular com força para acionar a rede de emergência.
         </Text>
       </View>
+
+      {/* MODAL DO PLANO MULHER SEGURA */}
+      <Modal visible={modalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🛡️ PLANO MULHER SEGURA</Text>
+            <Text style={styles.modalPrice}>R$ 10,00 / mês</Text>
+            <Text style={styles.modalDescription}>
+              • Monitoramento e localização GPS precisa em tempo real{"\n"}
+              • Alerta automático para a Central/Telegram{"\n"}
+              • Acionamento por movimento (Chacoalho){"\n"}
+              • Gravação discreta de áudio para evidências
+            </Text>
+
+            <TouchableOpacity 
+              style={styles.subscribeBtn}
+              onPress={() => {
+                setIsPlanActive(true);
+                setModalVisible(false);
+                Alert.alert("Sucesso", "Plano Mulher Segura ativado com sucesso!");
+              }}
+            >
+              <Text style={styles.subscribeBtnText}>ASSINAR OU RENOVAR</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
+              <Text style={styles.closeBtnText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
@@ -215,10 +257,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#A0A0A0',
     marginTop: 4,
-    marginBottom: 16,
+    marginBottom: 10,
+  },
+  planBadge: {
+    backgroundColor: '#1A1A1A',
+    borderColor: '#D4AF37',
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  planBadgeText: {
+    color: '#D4AF37',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   status: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
@@ -261,5 +317,61 @@ const styles = StyleSheet.create({
     color: '#A0A0A0',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#121212',
+    borderColor: '#D4AF37',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#D4AF37',
+    marginBottom: 6,
+  },
+  modalPrice: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  modalDescription: {
+    color: '#CCCCCC',
+    fontSize: 13,
+    lineHeight: 22,
+    marginBottom: 24,
+    textAlign: 'left',
+    width: '100%',
+  },
+  subscribeBtn: {
+    backgroundColor: '#D4AF37',
+    paddingVertical: 14,
+    width: '100%',
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  subscribeBtnText: {
+    color: '#000000',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  closeBtn: {
+    paddingVertical: 10,
+  },
+  closeBtnText: {
+    color: '#888888',
+    fontSize: 13,
   },
 });
