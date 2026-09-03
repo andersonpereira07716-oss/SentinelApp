@@ -2,43 +2,54 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
 import { Accelerometer } from 'expo-sensors';
+import { Audio } from 'expo-av';
 
 // CREDENCIAIS DO BOT DO TELEGRAM
 const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
 const TELEGRAM_CHAT_ID = '8903706213';
 
-// Limite de força de aceleração para detectar o chacoalho (sensibilidade)
+// Sensibilidade para detectar o chacoalho
 const SHAKE_THRESHOLD = 2.5;
 
 export default function App() {
   const [loading, setLoading] = useState(false);
   const [locationPermission, setLocationPermission] = useState(false);
+  const [audioPermission, setAudioPermission] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [recording, setRecording] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
+      // Solicita permissões de Localização e Microfone
+      let locStatus = await Location.requestForegroundPermissionsAsync();
+      if (locStatus.status === 'granted') {
         setLocationPermission(true);
+      }
+
+      let audioStatus = await Audio.requestPermissionsAsync();
+      if (audioStatus.status === 'granted') {
+        setAudioPermission(true);
       }
     })();
 
-    // Ativa a escuta do acelerômetro
     _subscribeAccelerometer();
 
     return () => {
       _unsubscribeAccelerometer();
+      if (recording) {
+        recording.stopAndUnloadAsync();
+      }
     };
   }, []);
 
   const _subscribeAccelerometer = () => {
-    Accelerometer.setUpdateInterval(100); // Checa a cada 100ms
+    Accelerometer.setUpdateInterval(100);
     const sub = Accelerometer.addListener(accelerometerData => {
       const { x, y, z } = accelerometerData;
-      // Calcula a magnitude da aceleração total (gravidade ~ 1.0)
       const gForce = Math.sqrt(x * x + y * y + z * z);
 
-      if (gForce > SHAKE_THRESHOLD && !loading) {
+      if (gForce > SHAKE_THRESHOLD && !loading && !isRecording) {
         handleSOS("Alerta ativado por movimento (Chacoalho)");
       }
     });
@@ -50,9 +61,36 @@ export default function App() {
     setSubscription(null);
   };
 
+  const startSilentAudioRecording = async () => {
+    try {
+      if (!audioPermission) {
+        const status = await Audio.requestPermissionsAsync();
+        if (status.status !== 'granted') return null;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+
+      setRecording(recording);
+      setIsRecording(true);
+      console.log("🎙️ Gravação de áudio de evidência iniciada em segundo plano...");
+      return recording;
+    } catch (err) {
+      console.error('Falha ao iniciar gravação de áudio:', err);
+      return null;
+    }
+  };
+
   const sendTelegramAlert = async (latitude, longitude, mapsUrl, triggerType) => {
     const message = `🚨 *ALERTA DE EMERGÊNCIA - SENTINEL* 🚨\n\n` +
-      `*Gatilho:* ${triggerType}\n\n` +
+      `*Gatilho:* ${triggerType}\n` +
+      `🎙️ *Gravação de Áudio:* Ativada em segundo plano\n\n` +
       `📍 *Localização:* \nLatitude: \`${latitude}\`\nLongitude: \`${longitude}\`\n\n` +
       `🔗 *Google Maps:* ${mapsUrl}`;
 
@@ -83,11 +121,14 @@ export default function App() {
       if (!locationPermission) {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert("Permissão Negada", "O aplicativo precisa da localização para enviar o alerta de emergência.");
+          Alert.alert("Permissão Negada", "O aplicativo precisa da localização para enviar o alerta.");
           setLoading(false);
           return;
         }
       }
+
+      // Inicia a gravação de áudio em segundo plano silenciosamente
+      await startSilentAudioRecording();
 
       // Captura a localização atual precisa
       let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
@@ -100,13 +141,13 @@ export default function App() {
       if (sent) {
         Alert.alert(
           "🚨 SOS DISPARADO!",
-          `Sua localização exata foi capturada via ${triggerSource} e enviada no Telegram.`,
+          `Localização enviada via Telegram e gravação de áudio de emergência iniciada.`,
           [{ text: "OK" }]
         );
       } else {
         Alert.alert(
           "🚨 SOS DISPARADO!",
-          `Localização capturada:\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}`,
+          `Localização capturada:\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}\nGravação ativada.`,
           [{ text: "OK" }]
         );
       }
@@ -123,27 +164,29 @@ export default function App() {
       <View style={styles.header}>
         <Text style={styles.title}>SENTINEL</Text>
         <Text style={styles.subtitle}>Proteção à Mulher & Patrulha</Text>
-        <Text style={styles.status}>Status: 🚨 MODO DE EMERGÊNCIA</Text>
+        <Text style={styles.status}>
+          {isRecording ? "🔴 GRAVANDO ÁUDIO DE EMERGÊNCIA" : "Status: 🚨 MODO DE EMERGÊNCIA"}
+        </Text>
       </View>
 
       <View style={styles.radarContainer}>
         <TouchableOpacity 
           activeOpacity={0.7} 
-          style={styles.button}
+          style={[styles.button, isRecording && styles.buttonRecording]}
           onPress={() => handleSOS("Botão SOS Pressionado")}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator size="large" color="#FFFFFF" />
           ) : (
-            <Text style={styles.sosText}>SOS</Text>
+            <Text style={styles.sosText}>{isRecording ? "REC" : "SOS"}</Text>
           )}
         </TouchableOpacity>
       </View>
 
       <View style={styles.footer}>
         <Text style={styles.tipText}>
-          Dica: Aperte o botão SOS ou chacoalhe o celular com força em caso de emergência para enviar a localização via Telegram.
+          Dica: Aperte o botão SOS ou chacoalhe o celular com força para enviar a localização e gravar o áudio do ambiente.
         </Text>
       </View>
     </SafeAreaView>
@@ -175,7 +218,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   status: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#FFFFFF',
     fontWeight: 'bold',
   },
@@ -198,6 +241,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 15,
+  },
+  buttonRecording: {
+    borderColor: '#FF0000',
+    backgroundColor: '#330000',
   },
   sosText: {
     fontSize: 36,
