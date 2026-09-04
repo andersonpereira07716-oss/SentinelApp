@@ -13,6 +13,15 @@
         "backgroundColor": "#ffffff"
       }
     },
-    "owner": "anderson456"
+    "owner": "anderson456",
+    "extra": {
+      "eas": {
+        "projectId": "4c810b76-b953-41ce-8662-e3fd214d9646"
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-audio"
+    ]
   }
 }

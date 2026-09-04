@@ -1,377 +1,230 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, TouchableOpacity, Alert, ActivityIndicator, Modal } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  TextInput,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import * as Location from 'expo-location';
-import { Accelerometer } from 'expo-sensors';
-import { Audio } from 'expo-av';
 
-const TELEGRAM_BOT_TOKEN = '8903706213:AAGOWD9ACzmf8pkB4Dx24JUIgPVzzarA6CY';
-const TELEGRAM_CHAT_ID = '7370681538';
-const SHAKE_THRESHOLD = 2.5;
+const API_URL = 'https://refined-blond-seek-axis.trycloudflare.com';
 
 export default function App() {
+  const [chatId, setChatId] = useState('');
+  const [isLogged, setIsLogged] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [locationPermission, setLocationPermission] = useState(false);
-  const [audioPermission, setAudioPermission] = useState(false);
-  const [subscription, setSubscription] = useState(null);
-  const [recording, setRecording] = useState(null);
-  const [isRecording, setIsRecording] = useState(false);
-  
-  // Estado do Plano Mulher Segura
-  const [isPlanActive, setIsPlanActive] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [sendingPanic, setSendingPanic] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      let locStatus = await Location.requestForegroundPermissionsAsync();
-      if (locStatus.status === 'granted') {
-        setLocationPermission(true);
-      }
-
-      let audioStatus = await Audio.requestPermissionsAsync();
-      if (audioStatus.status === 'granted') {
-        setAudioPermission(true);
-      }
-    })();
-
-    _subscribeAccelerometer();
-
-    return () => {
-      _unsubscribeAccelerometer();
-      if (recording) {
-        recording.stopAndUnloadAsync();
-      }
-    };
-  }, []);
-
-  const _subscribeAccelerometer = () => {
-    Accelerometer.setUpdateInterval(100);
-    const sub = Accelerometer.addListener(accelerometerData => {
-      const { x, y, z } = accelerometerData;
-      const gForce = Math.sqrt(x * x + y * y + z * z);
-
-      if (gForce > SHAKE_THRESHOLD && !loading && !isRecording) {
-        handleSOS("Alerta ativado por movimento (Chacoalho)");
-      }
-    });
-    setSubscription(sub);
-  };
-
-  const _unsubscribeAccelerometer = () => {
-    subscription && subscription.remove();
-    setSubscription(null);
-  };
-
-  const startSilentAudioRecording = async () => {
-    try {
-      if (!audioPermission) {
-        const status = await Audio.requestPermissionsAsync();
-        if (status.status !== 'granted') return null;
-      }
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      setRecording(recording);
-      setIsRecording(true);
-      return recording;
-    } catch (err) {
-      console.error('Falha ao iniciar gravação:', err);
-      return null;
+    if (isLogged) {
+      (async () => {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permissão Negada',
+            'O app precisa da sua localização para enviar alertas de emergência.'
+          );
+        }
+      })();
     }
-  };
+  }, [isLogged]);
 
-  const sendTelegramAlert = async (latitude, longitude, mapsUrl, triggerType) => {
-    const message = `🚨 *ALERTA DE EMERGÊNCIA - SENTINEL* 🚨\n\n` +
-      `*Gatilho:* ${triggerType}\n` +
-      `🎙️ *Gravação de Áudio:* Ativada em segundo plano\n` +
-      `🛡️ *Plano:* Mulher Segura (Ativo)\n\n` +
-      `📍 *Localização:* \nLatitude: \`${latitude}\`\nLongitude: \`${longitude}\`\n\n` +
-      `🔗 *Google Maps:* ${mapsUrl}`;
-
-    try {
-      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: message,
-          parse_mode: 'Markdown',
-        }),
-      });
-
-      const data = await response.json();
-      return data.ok;
-    } catch (error) {
-      console.error("Erro no envio do Telegram:", error);
-      return false;
-    }
-  };
-
-  const handleSOS = async (triggerSource = "Botão SOS Pressionado") => {
-    if (!isPlanActive) {
-      Alert.alert("Plano Inativo", "Ative o Plano Mulher Segura para liberar a proteção contínua de emergência.");
-      setModalVisible(true);
-      return;
+  const handleLogin = async () => {
+    if (!chatId.trim()) {
+      return Alert.alert('Atenção', 'Informe o seu Chat ID do Telegram.');
     }
 
     setLoading(true);
     try {
-      if (!locationPermission) {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          Alert.alert("Permissão Negada", "O aplicativo precisa da localização para enviar o alerta.");
-          setLoading(false);
-          return;
-        }
-      }
+      const response = await fetch(`${API_URL}/api/status/${chatId.trim()}`);
+      const data = await response.json();
 
-      await startSilentAudioRecording();
-
-      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const { latitude, longitude } = location.coords;
-      const mapsUrl = `https://maps.google.com/?q=${latitude},${longitude}`;
-
-      const sent = await sendTelegramAlert(latitude, longitude, mapsUrl, triggerSource);
-
-      if (sent) {
-        Alert.alert(
-          "🚨 SOS DISPARADO!",
-          `Localização enviada via Telegram e gravação de áudio de emergência iniciada.`,
-          [{ text: "OK" }]
-        );
+      if (data.ativo) {
+        setIsLogged(true);
       } else {
         Alert.alert(
-          "🚨 SOS DISPARADO!",
-          `Localização capturada:\nLat: ${latitude.toFixed(5)}, Long: ${longitude.toFixed(5)}\nGravação ativada.`,
-          [{ text: "OK" }]
+          'Acesso Negado',
+          'Sua assinatura está inativa ou o Chat ID não foi encontrado.'
         );
       }
-
     } catch (error) {
-      Alert.alert("Erro de Sinal", "Não foi possível obter a localização. Tente novamente.");
+      Alert.alert('Erro de Conexão', 'Não foi possível conectar ao servidor.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>SENTINEL</Text>
-        <Text style={styles.subtitle}>Proteção à Mulher & Patrulha</Text>
-        
-        <TouchableOpacity style={styles.planBadge} onPress={() => setModalVisible(true)}>
-          <Text style={styles.planBadgeText}>
-            🛡️ PLANO MULHER SEGURA: {isPlanActive ? 'ATIVO (R$ 10/mês)' : 'INATIVO'}
-          </Text>
-        </TouchableOpacity>
+  const handlePanic = async () => {
+    setSendingPanic(true);
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
 
-        <Text style={styles.status}>
-          {isRecording ? "🔴 GRAVANDO ÁUDIO DE EMERGÊNCIA" : "Status: 🚨 MODO DE EMERGÊNCIA"}
-        </Text>
-      </View>
+      const payload = {
+        chatId: chatId.trim(),
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      };
 
-      <View style={styles.radarContainer}>
-        <TouchableOpacity 
-          activeOpacity={0.7} 
-          style={[styles.button, isRecording && styles.buttonRecording]}
-          onPress={() => handleSOS("Botão SOS Pressionado")}
-          disabled={loading}
-        >
+      const response = await fetch(`${API_URL}/api/panico`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        Alert.alert(
+          '🚨 ALERTA ENVIADO',
+          'Sua localização de emergência foi registrada e enviada no Telegram!'
+        );
+      } else {
+        Alert.alert('Falha', data.error || 'Erro ao processar o pânico.');
+      }
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível obter a localização ou conectar ao servidor.');
+    } finally {
+      setSendingPanic(false);
+    }
+  };
+
+  if (!isLogged) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>SENTINEL APP</Text>
+        <Text style={styles.subtitle}>Digite o Chat ID do Telegram para acessar:</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Ex: 177247539498"
+          placeholderTextColor="#888"
+          keyboardType="numeric"
+          value={chatId}
+          onChangeText={setChatId}
+        />
+
+        <TouchableOpacity style={styles.loginButton} onPress={handleLogin} disabled={loading}>
           {loading ? (
-            <ActivityIndicator size="large" color="#FFFFFF" />
+            <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.sosText}>{isRecording ? "REC" : "SOS"}</Text>
+            <Text style={styles.loginButtonText}>ENTRAR</Text>
           )}
         </TouchableOpacity>
       </View>
+    );
+  }
 
-      <View style={styles.footer}>
-        <Text style={styles.tipText}>
-          Aperte o botão SOS ou chacoalhe o celular com força para acionar a rede de emergência.
-        </Text>
-      </View>
+  return (
+    <View style={styles.container}>
+      <Text style={styles.activeTitle}>SISTEMA SENTINEL ATIVO</Text>
+      <Text style={styles.userStatus}>Conectado como: ID {chatId}</Text>
 
-      {/* MODAL DO PLANO MULHER SEGURA */}
-      <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>🛡️ PLANO MULHER SEGURA</Text>
-            <Text style={styles.modalPrice}>R$ 10,00 / mês</Text>
-            <Text style={styles.modalDescription}>
-              • Monitoramento e localização GPS precisa em tempo real{"\n"}
-              • Alerta automático para a Central/Telegram{"\n"}
-              • Acionamento por movimento (Chacoalho){"\n"}
-              • Gravação discreta de áudio para evidências
-            </Text>
+      <TouchableOpacity
+        style={[styles.panicButton, sendingPanic && styles.panicButtonDisabled]}
+        onPress={handlePanic}
+        disabled={sendingPanic}
+      >
+        {sendingPanic ? (
+          <ActivityIndicator size="large" color="#fff" />
+        ) : (
+          <Text style={styles.panicButtonText}>PÂNICO</Text>
+        )}
+      </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.subscribeBtn}
-              onPress={() => {
-                setIsPlanActive(true);
-                setModalVisible(false);
-                Alert.alert("Sucesso", "Plano Mulher Segura ativado com sucesso!");
-              }}
-            >
-              <Text style={styles.subscribeBtnText}>ASSINAR OU RENOVAR</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeBtnText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-    </SafeAreaView>
+      <TouchableOpacity style={styles.logoutButton} onPress={() => setIsLogged(false)}>
+        <Text style={styles.logoutText}>Sair / Trocar ID</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#050505',
-    justifyContent: 'space-between',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-  },
-  header: {
+    backgroundColor: '#121212',
     alignItems: 'center',
-    marginTop: 20,
+    justifyContent: 'center',
+    padding: 20,
   },
   title: {
     fontSize: 28,
-    fontWeight: '900',
-    color: '#D4AF37',
-    letterSpacing: 4,
+    fontWeight: 'bold',
+    color: '#00E676',
+    marginBottom: 10,
   },
   subtitle: {
     fontSize: 14,
-    color: '#A0A0A0',
-    marginTop: 4,
-    marginBottom: 10,
+    color: '#AAA',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  planBadge: {
-    backgroundColor: '#1A1A1A',
-    borderColor: '#D4AF37',
+  input: {
+    width: '100%',
+    backgroundColor: '#1E1E1E',
+    color: '#FFF',
+    padding: 15,
+    borderRadius: 8,
+    fontSize: 16,
+    marginBottom: 15,
     borderWidth: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginBottom: 12,
+    borderColor: '#333',
   },
-  planBadgeText: {
-    color: '#D4AF37',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  status: {
-    fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  radarContainer: {
+  loginButton: {
+    width: '100%',
+    backgroundColor: '#00E676',
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 300,
   },
-  button: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 4,
-    borderColor: '#FF3B30',
-    backgroundColor: '#8B0000',
+  loginButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  activeTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#00E676',
+    marginBottom: 5,
+  },
+  userStatus: {
+    fontSize: 14,
+    color: '#888',
+    marginBottom: 50,
+  },
+  panicButton: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#D50000',
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 10,
-    shadowColor: '#FF3B30',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 15,
+    shadowColor: '#FF0000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
   },
-  buttonRecording: {
-    borderColor: '#FF0000',
-    backgroundColor: '#330000',
+  panicButtonDisabled: {
+    backgroundColor: '#550000',
   },
-  sosText: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#FFFFFF',
+  panicButtonText: {
+    color: '#FFF',
+    fontSize: 28,
+    fontWeight: 'bold',
     letterSpacing: 2,
   },
-  footer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
+  logoutButton: {
+    marginTop: 50,
   },
-  tipText: {
-    fontSize: 13,
-    color: '#A0A0A0',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    width: '100%',
-    backgroundColor: '#121212',
-    borderColor: '#D4AF37',
-    borderWidth: 1.5,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#D4AF37',
-    marginBottom: 6,
-  },
-  modalPrice: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  modalDescription: {
-    color: '#CCCCCC',
-    fontSize: 13,
-    lineHeight: 22,
-    marginBottom: 24,
-    textAlign: 'left',
-    width: '100%',
-  },
-  subscribeBtn: {
-    backgroundColor: '#D4AF37',
-    paddingVertical: 14,
-    width: '100%',
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  subscribeBtnText: {
-    color: '#000000',
-    fontWeight: '900',
-    fontSize: 14,
-  },
-  closeBtn: {
-    paddingVertical: 10,
-  },
-  closeBtnText: {
-    color: '#888888',
-    fontSize: 13,
+  logoutText: {
+    color: '#888',
+    textDecorationLine: 'underline',
   },
 });
+

@@ -1,61 +1,30 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-const LOCATION_TASK_NAME = 'BACKGROUND_LOCATION_SAFETY_TASK';
+const LOCATION_TASK_NAME = 'background-location-task';
 
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  projectId: "safety-app-id",
-  firestoreDbUrl: "https://safety-app-id.firebaseio.com"
-};
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-interface PoliceDispatcherPayload {
-  protocolVersion: string;
-  sourceApp: string;
-  incidentType: string;
-  timestamp: string;
-  victimInfo: {
-    lat: number;
-    lng: number;
-    accuracy: number;
-  };
-}
-
-async function dispatchToLocalPoliceAPI(latitude: number, longitude: number, accuracy: number) {
-  const policeEndpoint = 'https://api.seguranca.gov.br/v1/emergencia/cad-dispatch';
-  
-  const payload: PoliceDispatcherPayload = {
-    protocolVersion: '1.0',
-    sourceApp: 'SentinelSafetyApp',
-    incidentType: 'PANIC_BUTTON_SOS',
-    timestamp: new Date().toISOString(),
-    victimInfo: {
-      lat: latitude,
-      lng: longitude,
-      accuracy: accuracy
-    }
-  };
-
+async function dispatchToLocalPoliceAPI(latitude: number, longitude: number, accuracy: number | null) {
   try {
-    const response = await fetch(policeEndpoint, {
+    const response = await fetch('http://127.0.0.1:3000/api/alert', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer API_KEY_GOV_INTEGRATION'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        latitude,
+        longitude,
+        userId: 'Anderson',
+        accuracy,
+      }),
     });
-    console.log('[POLICE API] Status Dispatch:', response.status);
+    const data = await response.json();
+    console.log('[SENTINEL] Resposta do Servidor:', data);
   } catch (error) {
-    console.error('[POLICE API] Erro ao integrar com API Policial:', error);
+    console.error('[SENTINEL] Erro ao enviar alerta para a API:', error);
   }
 }
 
-TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
+TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
   if (error) {
     console.error('[BACKGROUND TASK] Erro na task de localização:', error);
     return;
@@ -66,14 +35,7 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 
     if (currentLocation) {
       const { latitude, longitude, accuracy } = currentLocation.coords;
-
-      await setDoc(doc(db, "activeIncidents", "CURRENT_USER_INCIDENT_ID"), {
-        currentLocation: { lat: latitude, lng: longitude },
-        accuracy: accuracy,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-
-      await dispatchToLocalPoliceAPI(latitude, longitude, accuracy || 0);
+      await dispatchToLocalPoliceAPI(latitude, longitude, accuracy);
     }
   }
 });
@@ -81,27 +43,21 @@ TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
 export async function startBackgroundLocationTracking() {
   const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
   if (foregroundStatus !== 'granted') {
-    throw new Error('Permissão de localização em primeiro plano negada.');
+    throw new Error('Permissão de localização em primeiro plano negada');
   }
 
   const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
   if (backgroundStatus !== 'granted') {
-    throw new Error('Permissão de localização em segundo plano negada.');
+    console.warn('Permissão de localização em segundo plano não concedida');
   }
 
-  const isRegistered = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-  if (!isRegistered) {
-    await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-      accuracy: Location.Accuracy.BestForNavigation,
-      timeInterval: 5000,
-      distanceInterval: 5,
-      showsBackgroundLocationIndicator: true,
-      foregroundService: {
-        notificationTitle: "Sentinel em Proteção Ativa",
-        notificationBody: "Sua localização está sendo transmitida com segurança.",
-        notificationColor: "#FF1744"
-      }
-    });
-    console.log('[LOCATION SERVICE] Rastreamento em background iniciado.');
-  }
+  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+    accuracy: Location.Accuracy.High,
+    timeInterval: 5000,
+    distanceInterval: 10,
+    foregroundService: {
+      notificationTitle: 'SentinelApp Ativo',
+      notificationBody: 'Monitorando sua localização em segundo plano para emergências.',
+    },
+  });
 }

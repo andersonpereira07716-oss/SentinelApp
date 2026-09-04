@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import { startShakeDetection } from './src/ShakeDetector';
 import { startBackgroundLocationTracking } from './src/LocationService';
-import { startStealthAudioRecording } from './src/AudioRecorder';
 import SentinelRadar from './assets/images/sentinel_radar.svg';
 
 export default function App() {
@@ -14,8 +13,7 @@ export default function App() {
 
     // Dispara em paralelo o rastreamento GPS e a gravação de áudio na nuvem
     await Promise.allSettled([
-      startBackgroundLocationTracking(),
-      startStealthAudioRecording()
+      startBackgroundLocationTracking(),    
     ]);
   };
 

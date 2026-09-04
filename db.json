@@ -1,0 +1,27 @@
+{
+  "assinaturas": {
+    "177247539498": {
+      "status": "ativo",
+      "payment_id": "TESTE_MANUAL",
+      "data_pagamento": "2026-09-04T12:00:00.000Z"
+    }
+  },
+  "alertas": [
+    {
+      "chatId": "177247539498",
+      "data": "2026-09-04T17:16:44.413Z",
+      "localizacao": {
+        "latitude": -7.0241,
+        "longitude": -37.2764
+      }
+    },
+    {
+      "chatId": "177247539498",
+      "data": "2026-09-04T17:43:37.862Z",
+      "localizacao": {
+        "latitude": -7.0241,
+        "longitude": -37.2764
+      }
+    }
+  ]
+}
