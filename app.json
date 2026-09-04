@@ -4,24 +4,25 @@
     "slug": "sentinelapp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "sentinelapp",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "light",
-    "jsEngine": "hermes",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
-      "package": "com.anderson456.sentinelapp",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.anderson.sentinelapp"
     },
-    "owner": "anderson456",
-    "extra": {
-      "eas": {
-        "projectId": "4c810b76-b953-41ce-8662-e3fd214d9646"
-      }
-    },
-    "plugins": [
-      "expo-asset",
-      "expo-audio"
-    ]
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    }
   }
 }
