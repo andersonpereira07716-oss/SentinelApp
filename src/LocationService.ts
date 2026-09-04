@@ -5,7 +5,7 @@ const LOCATION_TASK_NAME = 'background-location-task';
 
 async function dispatchToLocalPoliceAPI(latitude: number, longitude: number, accuracy: number | null) {
   try {
-    const response = await fetch('http://127.0.0.1:3000/api/alert', {
+    const response = await fetch('http://192.168.0.9:3000/api/alert', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -18,15 +18,15 @@ async function dispatchToLocalPoliceAPI(latitude: number, longitude: number, acc
       }),
     });
     const data = await response.json();
-    console.log('[SENTINEL] Resposta do Servidor:', data);
+    console.log('[SENTINEL] Resposta da API:', data);
   } catch (error) {
-    console.error('[SENTINEL] Erro ao enviar alerta para a API:', error);
+    console.error('[SENTINEL] Erro na requisição:', error);
   }
 }
 
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }: any) => {
   if (error) {
-    console.error('[BACKGROUND TASK] Erro na task de localização:', error);
+    console.error('[BACKGROUND TASK] Erro na task:', error);
     return;
   }
   if (data) {
